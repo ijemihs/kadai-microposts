@@ -50,7 +50,7 @@ class User extends Authenticatable
      */
     public function loadRelationshipCounts()
     {
-        $this->loadCount(['microposts', 'followings', 'followers']);
+        $this->loadCount(['microposts', 'followings', 'followers', 'favorites']);
     }
     
     /**
@@ -138,5 +138,67 @@ class User extends Authenticatable
         $userIds[] = $this->id;
         // それらのユーザが所有する投稿に絞り込む
         return Micropost::whereIn('user_id', $userIds);
+    }
+    
+    /**
+     * このユーザがお気に入り追加している投稿。(Micropostモデルとの関係を定義)
+     */
+    public function favorites()
+    {
+        return $this->belongsToMany(Micropost::class, 'favorites', 'user_id', 'micropost_id')->withTimestamps();
+    }
+    
+    /**
+     * $micropostIdで指定された投稿をお気に入り追加する。
+     * 
+     * @param int $micropostId
+     * @return bool
+     */
+    public function favorite($micropostId)
+    {
+        // すでにお気に入り追加しているかの確認
+        $exist = $this->is_favoring($micropostId);
+
+        if ($exist) {
+            // すでにお気に入り追加していれば何もしない
+            return false;
+        } else {
+            // お気に入り追加していなければ追加する
+            $this->favorites()->attach($micropostId);
+            return true;
+        }
+    }
+    
+    /**
+     * $micropostIdで指定された投稿をお気に入り削除する。
+     * 
+     * @param int $micropostId
+     * @return bool
+     */
+    public function unfavorite($micropostId)
+    {
+        // すでにお気に入り追加しているかの確認
+        $exist = $this->is_favoring($micropostId);
+        
+        if ($exist) {
+            // すでにお気に入り追加していれば削除する
+            $this->favorites()->detach($micropostId);
+            return true;
+        } else {
+            // お気に入り追加していなければ何もしない
+            return false;
+        }
+    }
+    
+    /**
+     * 指定された$micropostIdの投稿をこのユーザがお気に入り追加しているか調べる。お気に入り追加しているならtrueを返す。
+     * 
+     * @param int $micropostId
+     * @return bool
+     */
+    public function is_favoring($micropostId)
+    {
+        // お気に入り追加している投稿の中に$micropostIdのものが存在するか
+        return $this->favorites()->where('micropost_id', $micropostId)->exists();
     }
 }
